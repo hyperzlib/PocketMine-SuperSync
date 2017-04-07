@@ -1,15 +1,13 @@
 <?php
-$apipasswd = 'mctl2333'; //在此输入你的API密码，默认 mctl2333。 Enter your API password here. Default 'mctl2333'.
-$desql = array('UNION','ORDER',';','AND','OR','\'','"'); //SQL注入关键词
+$apipasswd = 'supersync'; //在此输入你的API密码，默认 supersync。 Enter your API password here. Default 'supersync'.
 error_reporting(E_ALL^E_NOTICE^E_WARNING); //关闭错误提示
 //验证密码
+
 if(empty($_COOKIE['sapi_password']) or $_COOKIE['sapi_password']!=$apipasswd){
 	echo $_COOKIE['sapi_password'];
 	exit;
 }
-function desql($text){
-	return str_replace(array('UNION','ORDER',';','AND','OR','\'','"'),'',$text);
-}
+
 include 'config/config_global.php';
 include 'config/config_ucenter.php';
 $uc = array(
@@ -29,13 +27,14 @@ if(empty($_GET['mode'])){//显示版本
 	echo json_encode($json);
 	exit;
 } elseif($_GET['mode']=='login') {//登录验证
-	$username = desql($_POST['username']);
-	$ip = desql($_POST['ip']);
+	$username = $_POST['username'];
+	$ip = $_POST['ip'];
 	$tab = $_config['db']['1']['tablepre'];
 	$dsn = 'mysql:dbname='.$uc['name'].';host='.$uc['host'];
 	$mysql = new PDO($dsn, $uc['user'], $uc['pw']);
-	$sql = 'SELECT `uid` FROM `'.$uc['tab'].'members` where `username`=\''.$username.'\'';
-	$result = $mysql->query($sql);
+	$sql = 'SELECT `uid` FROM `'.$uc['tab'].'members` where `username`=:username';
+	$result = $mysql->prepare($sql);
+	$result->execute([':username'=>$username]);
 	$uid = $result->fetch();
 	if(empty($uid)){
 		echo 'noreg';
@@ -51,7 +50,6 @@ if(empty($_GET['mode'])){//显示版本
 	if (!empty($sip)){
 		if($sip==$ip){
 			echo "true";
-			$mysql->exec($sql);
 		} else {
 			echo "false";
 		}
@@ -60,13 +58,14 @@ if(empty($_GET['mode'])){//显示版本
 	}
 } elseif($_GET['mode']=='submit'){//验证密码
 	//取值
-	$username = desql($_POST['username']);
-	$passwd = desql($_POST['password']);
+	$username = $_POST['username'];
+	$passwd = $_POST['password'];
 	//数据库部分
 	$dsn = 'mysql:dbname='.$uc['name'].';host='.$uc['host'];
 	$mysql = new PDO($dsn, $uc['user'], $uc['pw']);
-	$sql = 'SELECT * FROM `'.$uc['tab'].'members` WHERE username=\''.$username.'\'';
-	$result = $mysql->query($sql);
+	$sql = 'SELECT * FROM `'.$uc['tab'].'members` WHERE username=:username';
+	$result = $mysql->prepare($sql);
+	$result->execute([':username'=>$username]);
 	$sqldata = $result->fetch();
 	//判断密码
 	$hash = md5(md5($passwd).$sqldata['salt']);
@@ -76,10 +75,10 @@ if(empty($_GET['mode'])){//显示版本
 		echo 'false';
 	}
 } elseif($_GET['mode']=='register') {
-	$username = desql($_POST['username']);
-	$password = desql($_POST['password']);
-	$mail = desql($_POST['mail']);
-	$ip = desql($_POST['ip']);
+	$username = $_POST['username'];
+	$password = $_POST['password'];
+	$mail = $_POST['mail'];
+	$ip = $_POST['ip'];
 	//数据库部分
 	$dsn = 'mysql:dbname='.$uc['name'].';host='.$uc['host'];
 	$mysql = new PDO($dsn, $uc['user'], $uc['pw']);
@@ -90,20 +89,25 @@ if(empty($_GET['mode'])){//显示版本
 	$hash = md5(time());
 	$salt = substr($hash,rand(0,26),6);
 	$password = md5(md5($password).$salt);
-	$sql = 'INSERT INTO `uc_members` (`uid`, `username`, `password`, `email`, `myid`, `myidkey`, `regip`, `regdate`, `lastloginip`, `lastlogintime`, `salt`, `secques`) VALUES (\''.$uid.'\', \''.$username.'\', \''.$password.'\', \''.$mail.'\', \'\', \'\', \''.$ip.'\', \''.time().'\', \'0\', \'0\', \''.$salt.'\', \'\')';
-	$result = $mysql->exec($sql);
-	if($result==true){
-		echo 'true';
-	} else {
-		echo 'false';
-	}
+	$sql = 'INSERT INTO `uc_members` (`uid`, `username`, `password`, `email`, `myid`, `myidkey`, `regip`, `regdate`, `lastloginip`, `lastlogintime`, `salt`, `secques`) VALUES (:uid, :username, :password, :mail, \'\', \'\', :ip, \''.time().'\', \'0\', \'0\', :salt, \'\')';
+	$result = $mysql->prepare($sql);
+	$result->execute([
+		':uid' => $uid,
+		':username' => $username,
+		':password' => $password,
+		':mail' => $mail,
+		':ip' => $ip,
+		':salt' => $salt,
+	]);
+	echo 'true';
 } elseif($_GET['mode']=='data'){
-	$username = desql($_POST['username']);
+	$username = $_POST['username'];
 	$tab = $_config['db']['1']['tablepre'];
 	$dsn = 'mysql:dbname='.$uc['name'].';host='.$uc['host'];
 	$mysql = new PDO($dsn, $uc['user'], $uc['pw']);
-	$sql = 'SELECT `uid` FROM `'.$uc['tab'].'members` where `username`=\''.$username.'\'';
-	$result = $mysql->query($sql);
+	$sql = 'SELECT `uid` FROM `'.$uc['tab'].'members` where `username`=:username';
+	$result = $mysql->prepare($sql);
+	$result->execute([':username'=>$username]);
 	$uid = $result->fetch();
 	if(empty($uid)){
 		echo 'noreg';
@@ -121,12 +125,13 @@ if(empty($_GET['mode'])){//显示版本
 		echo 'data error';
 		exit;
 	}
-	$username = desql($_POST['username']);
+	$username = $_POST['username'];
 	$tab = $_config['db']['1']['tablepre'];
 	$dsn = 'mysql:dbname='.$uc['name'].';host='.$uc['host'];
 	$mysql = new PDO($dsn, $uc['user'], $uc['pw']);
-	$sql = 'SELECT `uid` FROM `'.$uc['tab'].'members` where `username`=\''.$username.'\'';
-	$result = $mysql->query($sql);
+	$sql = 'SELECT `uid` FROM `'.$uc['tab'].'members` where `username`=:username';
+	$result = $mysql->prepare($sql);
+	$result->execute([':username'=>$username]);
 	$uid = $result->fetch();
 	if(empty($uid)){
 		echo 'noreg';
